@@ -1,5 +1,5 @@
 use std::process::exit;
-use std::slice::Iter;
+// use std::slice::Iter;
 use crate::lexer::*;
 
 use Token::*;
@@ -17,8 +17,12 @@ pub enum NodeKind {
     Sub,
     Mul,
     Div,
+    Sin,
+    Cos,
+    Tan,
     Neg,
-    Der,
+    Exp,
+    Log,
 }
 
 #[derive(PartialEq)]
@@ -34,20 +38,40 @@ impl Node {
         match self {
             BinaryOperator { kind: kind, lhs: lhs, rhs: rhs } => {
                 lhs.print(indent + 1);
+                match kind {
+                    Add => { print!(" + "); }
+                    Sub => { print!(" - "); }
+                    Mul => { print!(" * "); }
+                    Div => { print!(" / "); }
+                    _ => { print!(""); }
+                }
                 rhs.print(indent + 1);
             },
             UnaryOperator { kind: kind, operand: operand } => {
+                match kind {
+                    Sin => { print!("sin "); }
+                    Cos => { print!("cos "); }
+                    Tan => { print!("tan "); }
+                    _ => { print!(" "); }
+                }
                 operand.print(indent + 1);
             },
             Var { name: name, point: point } => {
-                println!("{}{}", "    ".repeat(indent), name);
-                if *point != None {
-                    point.as_ref().unwrap().print(indent + 1);
+                match point {
+                    Some(node) => {
+                        node.print(indent + 1);
+                    },
+                    None => {
+                        print!("{}", name);
+                    },
                 }
             },
             Node::Num { val: val } => {
-                println!("{}{}", "    ".repeat(indent), val);
+                print!("{}", val);
             },
+        }
+        if indent == 0 {
+            println!();
         }
     }
 }
@@ -130,6 +154,9 @@ impl<'a> Parser<'a> {
     fn unary(&mut self) -> Node {
         if self.expect("+") { return self.unary(); }
         if self.expect("-") { return UnaryOperator { kind: Neg, operand: Box::new(self.unary()) }; }
+        if self.expect("sin") { return UnaryOperator { kind: Sin, operand: Box::new(self.unary()) }; }
+        if self.expect("cos") { return UnaryOperator { kind: Cos, operand: Box::new(self.unary()) }; }
+        if self.expect("tan") { return UnaryOperator { kind: Tan, operand: Box::new(self.unary()) }; }
         self.prim()
     }
 
@@ -137,6 +164,16 @@ impl<'a> Parser<'a> {
         let token = &self.token_list[self.pos];
         self.inc();
         match token {
+            Token::Reserved(name) => {
+                self.consume("(");
+                let lhs = self.expr();
+                self.consume(",");
+                let rhs = self.expr();
+                self.consume(")");
+                if name == "exp" { return Node::BinaryOperator { kind: Exp, lhs: Box::new(lhs), rhs: Box::new(rhs) }; }
+                if name == "log" { return Node::BinaryOperator { kind: Log, lhs: Box::new(lhs), rhs: Box::new(rhs) }; }
+                Node::Num { val: 0.0 }
+            },
             Token::Ident(ident) => {
                 Node::Var { name: ident.to_string(), point: None }
             },

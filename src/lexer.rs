@@ -7,6 +7,7 @@ pub enum Token {
     Num(u32),
 }
 
+const KEYWORDS: [&str; 5] = ["sin", "cos", "tan", "exp", "log"];
 const PUNCTS: [char; 17] = ['D', '=', '+', '-', '*', '/', '^', '.', ',', ':', ';', '(', ')', '{', '}', '[', ']'];
 
 pub fn tokenize(code: String) -> Vec<Token> {
@@ -42,7 +43,11 @@ pub fn tokenize(code: String) -> Vec<Token> {
                     }
                 }
             }
-            token_list.push(Ident(name));
+            if KEYWORDS.to_vec().iter().find(|&&x| x == name) != None {
+                token_list.push(Reserved(name));
+            } else {
+                token_list.push(Ident(name));
+            }
             continue;
         }
         if c.is_digit(10) {
