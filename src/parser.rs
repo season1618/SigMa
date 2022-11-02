@@ -11,7 +11,7 @@ fn error(msg: &str) {
     exit(256);
 }
 
-#[derive(Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum NodeKind {
     Add,
     Sub,
@@ -25,7 +25,7 @@ pub enum NodeKind {
     Log,
 }
 
-#[derive(Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Node {
     BinaryOperator { kind: NodeKind, lhs: Box<Node>, rhs: Box<Node> },
     UnaryOperator { kind: NodeKind, operand: Box<Node> },
@@ -36,7 +36,7 @@ pub enum Node {
 impl Node {
     fn print(&self, indent: usize) {
         match self {
-            BinaryOperator { kind: kind, lhs: lhs, rhs: rhs } => {
+            BinaryOperator { kind, lhs, rhs } => {
                 lhs.print(indent + 1);
                 match kind {
                     Add => { print!(" + "); }
@@ -47,7 +47,7 @@ impl Node {
                 }
                 rhs.print(indent + 1);
             },
-            UnaryOperator { kind: kind, operand: operand } => {
+            UnaryOperator { kind, operand } => {
                 match kind {
                     Sin => { print!("sin "); }
                     Cos => { print!("cos "); }
@@ -56,7 +56,7 @@ impl Node {
                 }
                 operand.print(indent + 1);
             },
-            Var { name: name, point: point } => {
+            Var { name, point } => {
                 match point {
                     Some(node) => {
                         node.print(indent + 1);
@@ -66,7 +66,7 @@ impl Node {
                     },
                 }
             },
-            Node::Num { val: val } => {
+            Node::Num { val } => {
                 print!("{}", val);
             },
         }
@@ -76,27 +76,45 @@ impl Node {
     }
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 enum SymbolTable {
     Item { top: Node, next: Box<SymbolTable> },
     Bottom,
 }
-
-// impl Copy for SymbolTable {}
 
 impl SymbolTable {
     fn new() -> Self {
         SymbolTable::Bottom
     }
 
+    fn top(&self) -> Option<Node> {
+        match self.clone() {
+            SymbolTable::Item { top, next } => {
+                Some(top)
+            },
+            SymbolTable::Bottom => {
+                None
+            },
+        }
+    }
+
     fn push(&mut self, node: Node) {
         match node {
-            Node::Var { ref name, ref point } => {
-                // let t = *self;
+            Node::Var { name: ref name, point: ref point } => {
                 *self = SymbolTable::Item { top: node, next: Box::new((*self).clone()) };
             },
             _ => {
                 error("not a symbol");
+            },
+        }
+    }
+
+    fn pop(&mut self) {
+        match self.clone() {
+            SymbolTable::Item { top, next } => {
+                *self = *next;
+            },
+            SymbolTable::Bottom => {
             },
         }
     }
@@ -107,7 +125,7 @@ impl SymbolTable {
             match item.clone() {
                 SymbolTable::Item { top, next } => {
                     match top.clone() {
-                        Node::Var { name: top_name, point } => {
+                        Node::Var { name: top_name, point: _ } => {
                             if *top_name == name { return Some(top); }
                             item = *next;
                         },
@@ -131,7 +149,6 @@ pub struct Parser<'a> {
 
 impl<'a> Parser<'a> {
     pub fn new(token_list: &'a Vec<Token>) -> Self {
-        let x = SymbolTable::new();
         Parser { token_list: token_list, pos: 0 }
     }
 
@@ -139,7 +156,7 @@ impl<'a> Parser<'a> {
         let mut node_list: Vec<Node> = Vec::new();
         while self.pos < self.token_list.len() {
             node_list.push(self.stmt());
-            node_list.last().unwrap().print(0);
+            // node_list.last().unwrap().print(0);
             // break;
         }
         node_list
@@ -229,10 +246,6 @@ impl<'a> Parser<'a> {
             Token::Num(val) => {
                 Node::Num { val: *val as f32 }
             },
-            _ => {
-                error("expected number");
-                Node::Num { val: 0.0 }
-            }
         }
     }
 
