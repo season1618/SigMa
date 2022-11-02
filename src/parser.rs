@@ -11,7 +11,7 @@ fn error(msg: &str) {
     exit(256);
 }
 
-#[derive(PartialEq)]
+#[derive(Clone, PartialEq)]
 pub enum NodeKind {
     Add,
     Sub,
@@ -25,7 +25,7 @@ pub enum NodeKind {
     Log,
 }
 
-#[derive(PartialEq)]
+#[derive(Clone, PartialEq)]
 pub enum Node {
     BinaryOperator { kind: NodeKind, lhs: Box<Node>, rhs: Box<Node> },
     UnaryOperator { kind: NodeKind, operand: Box<Node> },
@@ -76,6 +76,54 @@ impl Node {
     }
 }
 
+#[derive(Clone)]
+enum SymbolTable {
+    Item { top: Node, next: Box<SymbolTable> },
+    Bottom,
+}
+
+// impl Copy for SymbolTable {}
+
+impl SymbolTable {
+    fn new() -> Self {
+        SymbolTable::Bottom
+    }
+
+    fn push(&mut self, node: Node) {
+        match node {
+            Node::Var { ref name, ref point } => {
+                // let t = *self;
+                *self = SymbolTable::Item { top: node, next: Box::new((*self).clone()) };
+            },
+            _ => {
+                error("not a symbol");
+            },
+        }
+    }
+
+    fn find(&self, name: String) -> Option<Node> {
+        let mut item = (*self).clone();
+        loop {
+            match item.clone() {
+                SymbolTable::Item { top, next } => {
+                    match top.clone() {
+                        Node::Var { name: top_name, point } => {
+                            if *top_name == name { return Some(top); }
+                            item = *next;
+                        },
+                        _ => {
+                            error("not a type");
+                        },
+                    }
+                },
+                SymbolTable::Bottom => {
+                    return None;
+                }
+            }
+        }
+    }
+}
+
 pub struct Parser<'a> {
     token_list: &'a Vec<Token>,
     pos: usize,
@@ -83,6 +131,7 @@ pub struct Parser<'a> {
 
 impl<'a> Parser<'a> {
     pub fn new(token_list: &'a Vec<Token>) -> Self {
+        let x = SymbolTable::new();
         Parser { token_list: token_list, pos: 0 }
     }
 
