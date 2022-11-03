@@ -87,9 +87,9 @@ impl SymbolTable {
         SymbolTable::Bottom
     }
 
-    fn top(&self) -> Option<Node> {
-        match self.clone() {
-            SymbolTable::Item { top, next } => {
+    fn top(&mut self) -> Option<&mut Node> {
+        match self {
+            SymbolTable::Item { ref mut top, next } => {
                 Some(top)
             },
             SymbolTable::Bottom => {
@@ -101,10 +101,10 @@ impl SymbolTable {
     fn push(&mut self, node: Node) {
         match node {
             Node::Var { name: ref name, point: ref point } => {
-                *self = SymbolTable::Item { top: node, next: Box::new((*self).clone()) };
+                *self = SymbolTable::Item { top: node, next: Box::new(self.clone()) };
             },
             _ => {
-                error("not a symbol");
+                error("not a variable");
             },
         }
     }
@@ -119,26 +119,21 @@ impl SymbolTable {
         }
     }
 
-    fn find(&self, name: String) -> Option<Node> {
-        let mut item = (*self).clone();
-        loop {
-            match item.clone() {
-                SymbolTable::Item { top, next } => {
-                    match top.clone() {
-                        Node::Var { name: top_name, point: _ } => {
-                            if *top_name == name { return Some(top); }
-                            item = *next;
-                        },
-                        _ => {
-                            error("not a type");
-                        },
-                    }
-                },
-                SymbolTable::Bottom => {
-                    return None;
-                }
-            }
+    fn set(&mut self, name: String, node: &Node) {
+        let mut item: &mut SymbolTable = self;
+        let mut top: Node;
+        let mut next: Box<SymbolTable>;
+        match item.clone() {
+            SymbolTable::Item { top: top_tmp, next: next_tmp } => {
+                top = top_tmp.clone();
+                next = next_tmp.clone();
+            },
+            SymbolTable::Bottom => {
+                return;
+            },
         }
+        *item = SymbolTable::Item { top: node.clone(), next: next.clone() };
+        item = &mut *next;
     }
 }
 
@@ -149,6 +144,12 @@ pub struct Parser<'a> {
 
 impl<'a> Parser<'a> {
     pub fn new(token_list: &'a Vec<Token>) -> Self {
+        let mut table = SymbolTable::new();
+        table.push(Node::Var { name: "abc".to_string(), point: None });
+        table.push(Node::Var { name: "def".to_string(), point: None });
+        println!("{:?}", table);
+        table.set("def".to_string(), &Node::Var { name: "inf".to_string(), point: None });
+        println!("{:?}", table);
         Parser { token_list: token_list, pos: 0 }
     }
 
