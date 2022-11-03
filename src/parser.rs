@@ -130,15 +130,15 @@ impl SymbolTable {
     }
 }
 
-pub struct Parser<'a> {
-    token_list: &'a Vec<Token>,
+pub struct Parser {
+    token_list: Vec<Token>,
     pos: usize,
     symbol_table: SymbolTable,
 }
 
-impl<'a> Parser<'a> {
-    pub fn new(token_list: &'a Vec<Token>) -> Self {
-        Parser { token_list: token_list, pos: 0, symbol_table: SymbolTable::new() }
+impl Parser {
+    pub fn new<'a>(token_list: &'a Vec<Token>) -> Self {
+        Parser { token_list: token_list.clone(), pos: 0, symbol_table: SymbolTable::new() }
     }
 
     pub fn prog(&mut self) -> Vec<Node> {
@@ -151,10 +151,10 @@ impl<'a> Parser<'a> {
     }
 
     fn stmt(&mut self) {
-        let token = &self.token_list[self.pos];
+        let token = self.token_list[self.pos].clone();
         self.inc();
         match token {
-            Token::Reserved(s) if *s == "var".to_string() => {
+            Token::Reserved(s) if &*s == "var" => {
                 let var: Node;
                 let name = self.next_ident();
                 if self.expect("=") {
@@ -164,7 +164,7 @@ impl<'a> Parser<'a> {
                 }
                 self.symbol_table.push(var);
             },
-            Token::Reserved(s) if *s == "print".to_string() => {
+            Token::Reserved(s) if &*s == "print" => {
                 let ident = self.next_ident();
                 self.symbol_table.find(ident).print(0);
             },
@@ -225,10 +225,10 @@ impl<'a> Parser<'a> {
     }
 
     fn prim(&mut self) -> Node {
-        let token = &self.token_list[self.pos];
+        let token = self.token_list[self.pos].clone();
         self.inc();
         match token {
-            Token::Reserved(tok) if *tok == "(".to_string() => {
+            Token::Reserved(tok) if &*tok == "(" => {
                 let node = self.expr();
                 self.consume(")");
                 node
@@ -247,7 +247,7 @@ impl<'a> Parser<'a> {
                 self.symbol_table.find(ident.to_string())
             },
             Token::Num(val) => {
-                Node::Num { val: *val as f32 }
+                Node::Num { val: val as f32 }
             },
         }
     }
