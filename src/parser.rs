@@ -100,6 +100,21 @@ impl SymbolTable {
         self.pop();
     }
 
+    fn find(&mut self, name: String) -> Node {
+        for i in (0..self.vec.len()).rev() {
+            match self.vec[i] {
+                Node::Var { name: ref name_, point: ref point_ } => {
+                    if *name_ == name {
+                        return self.vec[i].clone();
+                    }
+                },
+                _ => {}
+            }
+        }
+        println!("error: {} is undeclared.", name);
+        Node::Num { val: 0.0 }
+    }
+
     fn set(&mut self, name: String, node: Node) {
         for i in (0..self.vec.len()).rev() {
             match self.vec[i] {
@@ -230,7 +245,7 @@ impl<'a> Parser<'a> {
                 Node::Num { val: 0.0 }
             },
             Token::Ident(ident) => {
-                Node::Var { name: ident.to_string(), point: None }
+                self.symbol_table.find(ident.to_string())
             },
             Token::Num(val) => {
                 Node::Num { val: *val as f32 }
