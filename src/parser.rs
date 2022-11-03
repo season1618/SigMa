@@ -1,9 +1,8 @@
 use std::process::exit;
-// use std::slice::Iter;
 use crate::lexer::*;
 
 use Token::*;
-use NodeKind::*;
+use OpKind::*;
 use Node::*;
 
 fn error(msg: &str) {
@@ -12,7 +11,7 @@ fn error(msg: &str) {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum NodeKind {
+pub enum OpKind {
     Add,
     Sub,
     Mul,
@@ -27,8 +26,8 @@ pub enum NodeKind {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Node {
-    BinaryOperator { kind: NodeKind, lhs: Box<Node>, rhs: Box<Node> },
-    UnaryOperator { kind: NodeKind, operand: Box<Node> },
+    BinaryOperator { kind: OpKind, lhs: Box<Node>, rhs: Box<Node> },
+    UnaryOperator { kind: OpKind, operand: Box<Node> },
     Var { name: String, point: Option<Box<Node>> },
     Num { val: f32 },
 }
@@ -139,12 +138,6 @@ pub struct Parser<'a> {
 
 impl<'a> Parser<'a> {
     pub fn new(token_list: &'a Vec<Token>) -> Self {
-        // let mut table = SymbolTable::new();
-        // table.push(Node::Var { name: "abc".to_string(), point: None });
-        // table.push(Node::Var { name: "def".to_string(), point: None });
-        // println!("{:?}", table);
-        // table.set("def".to_string(), Node::Var { name: "inf".to_string(), point: None });
-        // println!("{:?}", table);
         Parser { token_list: token_list, pos: 0, symbol_table: SymbolTable::new() }
     }
 
@@ -152,9 +145,6 @@ impl<'a> Parser<'a> {
         let mut node_list: Vec<Node> = Vec::new();
         while self.pos < self.token_list.len() {
             self.stmt();
-            // node_list.push(self.stmt());
-            // node_list.last().unwrap().print(0);
-            // break;
         }
         println!("{:?}", self.symbol_table);
         node_list
@@ -164,17 +154,21 @@ impl<'a> Parser<'a> {
         let token = &self.token_list[self.pos];
         self.inc();
         match token {
-            Reserved(symbol) if *symbol == "var".to_string() => {
-                let ident: Node;
+            Token::Reserved(s) if *s == "var".to_string() => {
+                let var: Node;
                 let name = self.next_ident();
                 if self.expect("=") {
-                    ident = Node::Var { name: name, point: Some(Box::new(self.expr())) };
+                    var = Node::Var { name: name, point: Some(Box::new(self.expr())) };
                 } else {
-                    ident = Node::Var { name: name, point: None };
+                    var = Node::Var { name: name, point: None };
                 }
-                self.symbol_table.push(ident);
+                self.symbol_table.push(var);
             },
-            Ident(name) => {
+            Token::Reserved(s) if *s == "print".to_string() => {
+                let ident = self.next_ident();
+                self.symbol_table.find(ident).print(0);
+            },
+            Token::Ident(name) => {
                 if self.expect("=") {
                     let value = self.expr();
                     self.symbol_table.set(name.to_string(), Node::Var { name: name.to_string(), point: Some(Box::new(value)) });
@@ -183,7 +177,7 @@ impl<'a> Parser<'a> {
             _ => {
                 error("expected an identifier");
             },
-        };
+        }
         self.consume(";");
     }
 
@@ -234,6 +228,11 @@ impl<'a> Parser<'a> {
         let token = &self.token_list[self.pos];
         self.inc();
         match token {
+            Token::Reserved(tok) if *tok == "(".to_string() => {
+                let node = self.expr();
+                self.consume(")");
+                node
+            },
             Token::Reserved(name) => {
                 self.consume("(");
                 let lhs = self.expr();

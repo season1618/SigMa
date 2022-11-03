@@ -7,7 +7,7 @@ pub enum Token {
     Num(u32),
 }
 
-const KEYWORDS: [&str; 6] = ["var", "sin", "cos", "tan", "exp", "log"];
+const KEYWORDS: [&str; 7] = ["var", "sin", "cos", "tan", "exp", "log", "print"];
 const PUNCTS: [char; 17] = ['D', '=', '+', '-', '*', '/', '^', '.', ',', ':', ';', '(', ')', '{', '}', '[', ']'];
 
 pub fn tokenize(code: String) -> Vec<Token> {
