@@ -106,18 +106,20 @@ impl SymbolTable {
                 Node::Var { name: ref name_, point: ref point_ } => {
                     if *name_ == name {
                         self.vec[i] = Node::Var { name: name, point: Some(Box::new(node)) };
-                        break;
+                        return;
                     }
                 },
                 _ => {}
             }
         }
+        println!("error: {} is undeclared.", name);
     }
 }
 
 pub struct Parser<'a> {
     token_list: &'a Vec<Token>,
     pos: usize,
+    symbol_table: SymbolTable,
 }
 
 impl<'a> Parser<'a> {
@@ -128,38 +130,46 @@ impl<'a> Parser<'a> {
         // println!("{:?}", table);
         // table.set("def".to_string(), Node::Var { name: "inf".to_string(), point: None });
         // println!("{:?}", table);
-        Parser { token_list: token_list, pos: 0 }
+        Parser { token_list: token_list, pos: 0, symbol_table: SymbolTable::new() }
     }
 
     pub fn prog(&mut self) -> Vec<Node> {
         let mut node_list: Vec<Node> = Vec::new();
         while self.pos < self.token_list.len() {
-            node_list.push(self.stmt());
+            self.stmt();
+            // node_list.push(self.stmt());
             // node_list.last().unwrap().print(0);
             // break;
         }
+        println!("{:?}", self.symbol_table);
         node_list
     }
 
-    fn stmt(&mut self) -> Node {
+    fn stmt(&mut self) {
         let token = &self.token_list[self.pos];
         self.inc();
-        let node = match token {
+        match token {
+            Reserved(symbol) if *symbol == "var".to_string() => {
+                let ident: Node;
+                let name = self.next_ident();
+                if self.expect("=") {
+                    ident = Node::Var { name: name, point: Some(Box::new(self.expr())) };
+                } else {
+                    ident = Node::Var { name: name, point: None };
+                }
+                self.symbol_table.push(ident);
+            },
             Ident(name) => {
-                let mut ident = Node::Var { name: name.to_string(), point: None };
                 if self.expect("=") {
                     let value = self.expr();
-                    ident = Node::Var { name: name.to_string(), point: Some(Box::new(value)) };
+                    self.symbol_table.set(name.to_string(), Node::Var { name: name.to_string(), point: Some(Box::new(value)) });
                 }
-                ident
             },
             _ => {
                 error("expected an identifier");
-                Node::Num { val: 0.0 }
             },
         };
         self.consume(";");
-        return node;
     }
 
     fn expr(&mut self) -> Node {
@@ -259,6 +269,19 @@ impl<'a> Parser<'a> {
             _ => {
                 println!("error: expected '{}'", name);
             },
+        }
+    }
+
+    fn next_ident(&mut self) -> String {
+        match &self.token_list[self.pos] {
+            Ident(ident) => {
+                self.pos += 1;
+                ident.to_string()
+            },
+            _ => {
+                println!("error: expected an identifier");
+                String::from("_")
+            }
         }
     }
 }

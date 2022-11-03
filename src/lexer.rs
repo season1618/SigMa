@@ -7,7 +7,7 @@ pub enum Token {
     Num(u32),
 }
 
-const KEYWORDS: [&str; 5] = ["sin", "cos", "tan", "exp", "log"];
+const KEYWORDS: [&str; 6] = ["var", "sin", "cos", "tan", "exp", "log"];
 const PUNCTS: [char; 17] = ['D', '=', '+', '-', '*', '/', '^', '.', ',', ':', ';', '(', ')', '{', '}', '[', ']'];
 
 pub fn tokenize(code: String) -> Vec<Token> {
@@ -72,18 +72,18 @@ pub fn tokenize(code: String) -> Vec<Token> {
         }
         break;
     }
-    for token in &token_list {
-        match token {
-            Reserved(symbol) => {
-                print!("{} ", symbol);
-            },
-            Ident(name) => {
-                print!("{} ", name);
-            },
-            Num(val) => {
-                print!("{} ", val);
-            }
-        }
-    }
+    // for token in &token_list {
+    //     match token {
+    //         Reserved(symbol) => {
+    //             print!("{} ", symbol);
+    //         },
+    //         Ident(name) => {
+    //             print!("{} ", name);
+    //         },
+    //         Num(val) => {
+    //             print!("{} ", val);
+    //         }
+    //     }
+    // }
     token_list
 }
