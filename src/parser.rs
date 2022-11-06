@@ -24,6 +24,40 @@ pub enum OpKind {
     Log,
 }
 
+#[derive(Debug, Clone)]
+struct Operator {
+    name: String,
+    args: Vec<Node>,
+    cont: Node,
+}
+
+impl Operator {
+    fn construct(&self, cont: Node, params: Vec<Node>) -> Node {
+        match cont {
+            BinaryOperator { kind, lhs, rhs } => {
+                BinaryOperator { kind, lhs: Box::new(self.construct(*lhs, params.clone())), rhs: Box::new(self.construct(*rhs, params.clone())) }
+            },
+            UnaryOperator { kind, operand } => {
+                UnaryOperator { kind, operand: Box::new(self.construct(*operand, params.clone())) }
+            },
+            Var { name, point } => {
+                for i in 0..self.args.len() {
+                    match self.args[i] {
+                        Var { name: ref name_, point: ref point_ } if *name_ == name => {
+                            return params[i].clone();
+                        },
+                        _ => {}
+                    }
+                }
+                Var { name, point }
+            },
+            Node::Num { val } => {
+                cont
+            },
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum Node {
     BinaryOperator { kind: OpKind, lhs: Box<Node>, rhs: Box<Node> },
@@ -76,6 +110,38 @@ impl Node {
 }
 
 #[derive(Debug, Clone)]
+struct OperatorTable {
+    vec: Vec<Operator>,
+}
+
+impl OperatorTable {
+    fn new() -> Self {
+        OperatorTable { vec: Vec::new() }
+    }
+
+    fn push(&mut self, item: Operator) {
+        self.vec.push(item);
+    }
+
+    fn pop(&mut self) {
+        self.vec.pop();
+    }
+
+    fn find(&mut self, name: String) -> Operator {
+        for i in (0..self.vec.len()).rev() {
+            match self.vec[i] {
+                Operator { name: ref name_, args: ref args_, cont: ref cont_ } if *name_ == name => {
+                    return self.vec[i].clone();
+                },
+                _ => {},
+            }
+        }
+        println!("error: {} is undeclared.", name);
+        Operator { name: String::new(), args: Vec::new(), cont: Node::Num { val: 0.0 } }
+    }
+}
+
+#[derive(Debug, Clone)]
 struct SymbolTable {
     vec: Vec<Node>,
 }
@@ -86,28 +152,27 @@ impl SymbolTable {
     }
 
     fn push(&mut self, node: Node) {
-        match node {
-            Node::Var { name: ref name, point: ref point } => {
-                self.vec.push(node);
-            },
-            _ => {
-            },
-        }
+        self.vec.push(node);
+        // match node {
+        //     Node::Var { name: ref name, point: ref point } => {
+        //         self.vec.push(node);
+        //     },
+        //     _ => {
+        //     },
+        // }
     }
 
     fn pop(&mut self) {
-        self.pop();
+        self.vec.pop();
     }
 
     fn find(&mut self, name: String) -> Node {
         for i in (0..self.vec.len()).rev() {
             match self.vec[i] {
-                Node::Var { name: ref name_, point: ref point_ } => {
-                    if *name_ == name {
-                        return self.vec[i].clone();
-                    }
+                Node::Var { name: ref name_, point: ref point_ } if *name_ == name => {
+                    return self.vec[i].clone();
                 },
-                _ => {}
+                _ => {},
             }
         }
         println!("error: {} is undeclared.", name);
@@ -134,11 +199,17 @@ pub struct Parser {
     token_list: Vec<Token>,
     pos: usize,
     symbol_table: SymbolTable,
+    op_table: OperatorTable,
 }
 
 impl Parser {
     pub fn new<'a>(token_list: &'a Vec<Token>) -> Self {
-        Parser { token_list: token_list.clone(), pos: 0, symbol_table: SymbolTable::new() }
+        Parser {
+            token_list: token_list.clone(),
+            pos: 0,
+            symbol_table: SymbolTable::new(),
+            op_table: OperatorTable::new(),
+        }
     }
 
     pub fn prog(&mut self) -> Vec<Node> {
@@ -146,7 +217,7 @@ impl Parser {
         while self.pos < self.token_list.len() {
             self.stmt();
         }
-        println!("{:?}", self.symbol_table);
+        // println!("{:?}", self.symbol_table);
         node_list
     }
 
@@ -163,6 +234,26 @@ impl Parser {
                     var = Node::Var { name: name, point: None };
                 }
                 self.symbol_table.push(var);
+            },
+            Token::Reserved(s) if s == "op" => {
+                let name = self.next_ident();
+                let mut args = Vec::new();
+
+                self.consume("(");
+                loop {
+                    let arg = Node::Var { name: self.next_ident(), point: None };
+                    args.push(arg.clone());
+                    self.symbol_table.push(arg);
+                    if self.expect(",") { continue; }
+                    if self.expect(")") { break; }
+                }
+
+                self.consume("{");
+                let cont = self.expr();
+                self.consume("}");
+
+                let operator = Operator { name, args, cont };
+                self.op_table.push(operator);
             },
             Token::Reserved(s) if &*s == "print" => {
                 let ident = self.next_ident();
@@ -244,7 +335,22 @@ impl Parser {
                 Node::Num { val: 0.0 }
             },
             Token::Ident(ident) => {
-                self.symbol_table.find(ident.to_string())
+                let node = self.symbol_table.find(ident.clone());
+                match node {
+                    Node::Num { ref val } if *val == 0.0 => {},
+                    _ => { return node; },
+                }
+                let op = self.op_table.find(ident.clone());
+                let mut params = Vec::new();
+                self.consume("(");
+                loop {
+                    let param = self.expr();
+                    params.push(param);
+                    if self.expect(",") { continue; }
+                    if self.expect(")") { break; }
+                }
+
+                op.construct(op.cont.clone(), params)
             },
             Token::Num(val) => {
                 Node::Num { val: val as f32 }
@@ -274,11 +380,8 @@ impl Parser {
 
     fn consume(&mut self, name: &str) {
         match &self.token_list[self.pos] {
-            Reserved(symbol) => {
+            Reserved(symbol) if symbol == name => {
                 self.pos += 1;
-                if symbol != name {
-                    println!("error: expected '{}'", name);
-                }
             },
             _ => {
                 println!("error: expected '{}'", name);
