@@ -3,7 +3,7 @@ pub mod parser;
 
 use std::env;
 use std::fs;
-use crate::lexer::tokenize;
+use crate::lexer::Lexer;
 use crate::parser::Parser;
 
 fn main() {
@@ -13,7 +13,8 @@ fn main() {
     println!("In file {}", file_path);
 
     let code = fs::read_to_string(file_path).expect("Should have been able to read the file");
-    let token_list = tokenize(code);
-    let mut parser: Parser = Parser::new(&token_list);
+    let mut lexer = Lexer::new(code);
+    let token_list = lexer.tokenize();
+    let mut parser = Parser::new(&token_list);
     let node_list = parser.prog();
 }

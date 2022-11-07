@@ -7,83 +7,91 @@ pub enum Token {
     Num(u32),
 }
 
+pub struct Lexer {
+    chs: Vec<char>,
+    pos: usize,
+}
+
 const KEYWORDS: [&str; 8] = ["var", "op", "sin", "cos", "tan", "exp", "log", "print"];
 const PUNCTS: [char; 17] = ['D', '=', '+', '-', '*', '/', '^', '.', ',', ':', ';', '(', ')', '{', '}', '[', ']'];
 
-pub fn tokenize(code: String) -> Vec<Token> {
-    let mut iter = code.chars();
-    let mut itr = iter.next();
-    let mut c;
-    let mut token_list: Vec<Token> = Vec::new();
-    while itr != None {
-        c = itr.unwrap();
-        if c.is_whitespace() {
-            itr = iter.next();
-            continue;
+impl Lexer {
+    pub fn new(code: String) -> Self {
+        Lexer {
+            chs: code.chars().collect::<Vec<char>>(),
+            pos: 0,
         }
-        if PUNCTS.to_vec().iter().find(|&&x| x == c) != None {
-            token_list.push(Reserved(c.to_string()));
-            itr = iter.next();
-            continue;
-        }
-        if c.is_ascii_alphabetic() {
-            let mut name: String = c.to_string();
-            loop {
-                itr = iter.next();
-                match itr {
-                    Some(c) => {
-                        if c.is_ascii_alphanumeric() {
-                            name.push(c);
-                        } else {
-                            break;
-                        }
-                    },
-                    None => {
-                        break;
-                    }
-                }
-            }
-            if KEYWORDS.to_vec().iter().find(|&&x| x == name) != None {
-                token_list.push(Reserved(name));
-            } else {
-                token_list.push(Ident(name));
-            }
-            continue;
-        }
-        if c.is_digit(10) {
-            let mut val = c.to_digit(10).unwrap();
-            loop {
-                itr = iter.next();
-                match itr {
-                    Some(c) => {
-                        if c.is_digit(10) {
-                            val = 10 * val + c.to_digit(10).unwrap();
-                        } else {
-                            break;
-                        }
-                    },
-                    None => {
-                        break;
-                    }
-                }
-            }
-            token_list.push(Num(val));
-            continue;
-        }
-        break;
     }
-    // for token in &token_list {
-    //     match token {
-    //         Reserved(symbol) => {
-    //             print!("{} ", symbol);
-    //         },
-    //         Ident(name) => {
-    //             print!("{} ", name);
-    //         },
-    //         Num(val) => {
-    //             print!("{} ", val);
-    //         }
-    //     }
-    // }
-    token_list
+
+    pub fn tokenize(&mut self) -> Vec<Token> {
+        let mut token_list = Vec::new();
+        while self.pos < self.chs.len() {
+            let mut c = self.chs[self.pos];
+            if c == '/' && self.chs[self.pos+1] == '/' {
+                loop {
+                    self.pos += 1;
+                    if self.chs[self.pos] == '\n' {
+                        break;
+                    }
+                }
+                continue;
+            }
+            if c.is_whitespace() {
+                self.pos += 1;
+                continue;
+            }
+            if PUNCTS.to_vec().iter().find(|&&x| x == c) != None {
+                token_list.push(Reserved(c.to_string()));
+                self.pos += 1;
+                continue;
+            }
+            if c.is_ascii_alphabetic() {
+                let mut name = c.to_string();
+                loop {
+                    self.pos += 1;
+                    c = self.chs[self.pos];
+                    if c.is_ascii_alphanumeric() {
+                        name.push(c);
+                    } else {
+                        break;
+                    }
+                }
+                if KEYWORDS.to_vec().iter().find(|&&x| x == name) != None {
+                    token_list.push(Reserved(name));
+                } else {
+                    token_list.push(Ident(name));
+                }
+                continue;
+            }
+            if c.is_digit(10) {
+                let mut val = c.to_digit(10).unwrap();
+                loop {
+                    self.pos += 1;
+                    c = self.chs[self.pos];
+                    if c.is_digit(10) {
+                        val = 10 * val + c.to_digit(10).unwrap();
+                    } else {
+                        break;
+                    }
+                }
+                token_list.push(Num(val));
+                continue;
+            }
+            break;
+        }
+        // for token in &token_list {
+        //     match token {
+        //         Reserved(symbol) => {
+        //             print!("{} ", symbol);
+        //         },
+        //         Ident(name) => {
+        //             print!("{} ", name);
+        //         },
+        //         Num(val) => {
+        //             print!("{} ", val);
+        //         }
+        //     }
+        // }
+        token_list
+    }
 }
