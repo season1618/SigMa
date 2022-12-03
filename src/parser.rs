@@ -2,7 +2,8 @@ use std::process::exit;
 use crate::lexer::*;
 
 use Token::*;
-use OpKind::*;
+use BKind::*;
+use UKind::*;
 use Node::*;
 
 fn error(msg: &str) {
@@ -11,15 +12,19 @@ fn error(msg: &str) {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum OpKind {
+pub enum BKind {
     Add,
     Sub,
     Mul,
     Div,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum UKind {
+    Neg,
     Sin,
     Cos,
     Tan,
-    Neg,
     Exp,
     Log,
 }
@@ -43,7 +48,7 @@ impl Operator {
             Var { name, point } => {
                 for i in 0..self.args.len() {
                     match self.args[i] {
-                        Var { name: ref name_, point: ref point_ } if *name_ == name => {
+                        Var { name: ref name_, .. } if *name_ == name => {
                             return params[i].clone();
                         },
                         _ => {}
@@ -51,7 +56,7 @@ impl Operator {
                 }
                 Var { name, point }
             },
-            Node::Num { val } => {
+            Node::Num { .. } => {
                 cont
             },
         }
@@ -60,13 +65,128 @@ impl Operator {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Node {
-    BinaryOperator { kind: OpKind, lhs: Box<Node>, rhs: Box<Node> },
-    UnaryOperator { kind: OpKind, operand: Box<Node> },
+    BinaryOperator { kind: BKind, lhs: Box<Node>, rhs: Box<Node> },
+    UnaryOperator { kind: UKind, operand: Box<Node> },
     Var { name: String, point: Option<Box<Node>> },
     Num { val: f32 },
 }
 
 impl Node {
+    fn equiv(node1: Node, node2: Node) -> bool {
+        match node1 {
+            Node::BinaryOperator { kind: kind1, lhs: lhs1, rhs: rhs1 } => {
+                match node2 {
+                    BinaryOperator { kind: kind2, lhs: lhs2, rhs: rhs2 } => {
+                        kind1 == kind2 && Node::equiv(*lhs1, *lhs2) && Node::equiv(*rhs1, *rhs2)
+                    },
+                    _ => false
+                }
+            },
+            Node::UnaryOperator { kind: kind1, operand: operand1 } => {
+                match node2 {
+                    UnaryOperator { kind: kind2, operand: operand2 } => {
+                        kind1 == kind2 && Node::equiv(*operand1, *operand2)
+                    },
+                    _ => false
+                }
+            },
+            Node::Var { name: name1, .. } => {
+                match node2 {
+                    Node::Var { name: name2, .. } => { name1 == name2 },
+                    _ => false
+                }
+            },
+            Node::Num { val: val1 } => {
+                match node2 {
+                    Node::Num { val: val2 } => { val1 == val2 },
+                    _ => false
+                }
+            },
+        }
+    }
+
+    fn dif(node1: Node, node2: Node) -> Node {
+        if Node::equiv(node1.clone(), node2.clone()) {
+            return Node::Num { val: 1.0 };
+        }
+        match node1 {
+            Node::BinaryOperator { kind, lhs, rhs } => {
+                match kind {
+                    Add => Node::BinaryOperator { kind: Add, lhs: Box::new(Node::dif(*lhs, node2.clone())), rhs: Box::new(Node::dif(*rhs, node2.clone())) },
+                    Sub => Node::BinaryOperator { kind: Sub, lhs: Box::new(Node::dif(*lhs, node2.clone())), rhs: Box::new(Node::dif(*rhs, node2.clone())) },
+                    Mul => Node::BinaryOperator {
+                        kind: Add,
+                        lhs: Box::new(Node::BinaryOperator { kind: Mul, lhs: Box::new(Node::dif((*lhs).clone(), node2.clone())), rhs: Box::new((*rhs).clone()) }),
+                        rhs: Box::new(Node::BinaryOperator { kind: Mul, lhs: Box::new((*lhs).clone()), rhs: Box::new(Node::dif((*rhs).clone(), node2.clone())) })
+                    },
+                    Div => Node::BinaryOperator {
+                        kind: Div,
+                        lhs: Box::new(Node::BinaryOperator {
+                            kind: Sub,
+                            lhs: Box::new(Node::BinaryOperator { kind: Mul, lhs: Box::new(Node::dif((*lhs).clone(), node2.clone())), rhs: Box::new((*rhs).clone()) }),
+                            rhs: Box::new(Node::BinaryOperator { kind: Mul, lhs: Box::new((*lhs).clone()), rhs: Box::new(Node::dif((*rhs).clone(), node2.clone())) })
+                        }),
+                        rhs: Box::new(Node::BinaryOperator { kind: Mul, lhs: Box::new(node2.clone()), rhs: Box::new(node2.clone()) })
+                    }
+                }
+            },
+            Node::UnaryOperator { kind, operand } => {
+                match kind {
+                    Neg => Node::UnaryOperator { kind: Neg, operand: Box::new(Node::dif(*operand, node2)) },
+                    Sin => Node::BinaryOperator {
+                        kind: Mul,
+                        lhs: Box::new(Node::dif((*operand).clone(), node2)),
+                        rhs: Box::new(Node::UnaryOperator { kind: Cos, operand: Box::new((*operand).clone()) })
+                    },
+                    Cos => Node::UnaryOperator {
+                        kind: Neg,
+                        operand: Box::new(Node::BinaryOperator {
+                            kind: Mul,
+                            lhs: Box::new(Node::dif((*operand).clone(), node2)),
+                            rhs: Box::new(Node::UnaryOperator { kind: Sin, operand: Box::new((*operand).clone()) })
+                        })
+                    },
+                    Tan => Node::BinaryOperator {
+                        kind: Div,
+                        lhs: Box::new(Node::dif((*operand).clone(), node2.clone())),
+                        rhs: Box::new(Node::BinaryOperator {
+                            kind: Mul,
+                            lhs: Box::new(Node::UnaryOperator { kind: Cos, operand: Box::new((*operand).clone()) }),
+                            rhs: Box::new(Node::UnaryOperator { kind: Cos, operand: Box::new((*operand).clone()) })
+                        })
+                    },
+                    Exp => Node::BinaryOperator {
+                        kind: Mul,
+                        lhs: Box::new(Node::dif((*operand).clone(), node2.clone())),
+                        rhs: Box::new(Node::UnaryOperator { kind: Exp, operand: Box::new((*operand).clone()) })
+                    },
+                    Log => Node::BinaryOperator {
+                        kind: Div,
+                        lhs: Box::new(Node::dif((*operand).clone(), node2)),
+                        rhs: Box::new(Node::UnaryOperator { kind: Exp, operand: Box::new((*operand).clone()) })
+                    },
+                }
+            },
+            Node::Var { name, point } => {
+                match node2 {
+                    Node::Var { name: name_, .. } if name == name_ => {
+                        return Node::Num { val: 1.0 };
+                    },
+                    Node::Var { .. } => {
+                        match point {
+                            Some(node) => Node::dif(*node, node2.clone()),
+                            None => Node::Num { val: 0.0 }
+                        }
+                    },
+                    _ => {
+                        Node::Num { val: 0.0 }
+                    },
+                }
+            },
+            Node::Num { .. } => Node::Num { val: 0.0 },
+        }
+    }
+
     fn print(&self, indent: usize) {
         match self {
             BinaryOperator { kind, lhs, rhs } => {
@@ -76,18 +196,17 @@ impl Node {
                     Sub => { print!(" - "); }
                     Mul => { print!(" * "); }
                     Div => { print!(" / "); }
-                    _ => { print!(""); }
                 }
                 rhs.print(indent + 1);
             },
             UnaryOperator { kind, operand } => {
                 match kind {
+                    Neg => { print!("- "); }
                     Sin => { print!("sin "); }
                     Cos => { print!("cos "); }
                     Tan => { print!("tan "); }
                     Exp => { print!("exp "); }
                     Log => { print!("log "); }
-                    _ => { print!(" "); }
                 }
                 operand.print(indent + 1);
             },
@@ -132,7 +251,7 @@ impl OperatorTable {
     fn find(&mut self, name: String) -> Operator {
         for i in (0..self.vec.len()).rev() {
             match self.vec[i] {
-                Operator { name: ref name_, args: ref args_, cont: ref cont_ } if *name_ == name => {
+                Operator { name: ref name_, .. } if *name_ == name => {
                     return self.vec[i].clone();
                 },
                 _ => {},
@@ -171,7 +290,7 @@ impl SymbolTable {
     fn find(&mut self, name: String) -> Node {
         for i in (0..self.vec.len()).rev() {
             match self.vec[i] {
-                Node::Var { name: ref name_, point: ref point_ } if *name_ == name => {
+                Node::Var { name: ref name_, .. } if *name_ == name => {
                     return self.vec[i].clone();
                 },
                 _ => {},
@@ -184,11 +303,9 @@ impl SymbolTable {
     fn set(&mut self, name: String, node: Node) {
         for i in (0..self.vec.len()).rev() {
             match self.vec[i] {
-                Node::Var { name: ref name_, point: ref point_ } => {
-                    if *name_ == name {
-                        self.vec[i] = Node::Var { name: name, point: Some(Box::new(node)) };
-                        return;
-                    }
+                Node::Var { name: ref name_, .. } if *name_ == name => {
+                    self.vec[i] = Node::Var { name: name, point: Some(Box::new(node)) };
+                    return;
                 },
                 _ => {}
             }
@@ -225,9 +342,10 @@ impl Parser {
 
     fn stmt(&mut self) {
         let token = self.token_list[self.pos].clone();
-        self.inc();
         match token {
             Token::Reserved(s) if &*s == "var" => {
+                self.inc();
+
                 let var: Node;
                 let name = self.next_ident();
                 if self.expect("=") {
@@ -237,7 +355,9 @@ impl Parser {
                 }
                 self.symbol_table.push(var);
             },
-            Token::Reserved(s) if s == "op" => {
+            Token::Reserved(s) if &*s == "op" => {
+                self.inc();
+
                 let name = self.next_ident();
                 let mut args = Vec::new();
 
@@ -258,17 +378,21 @@ impl Parser {
                 self.op_table.push(operator);
             },
             Token::Reserved(s) if &*s == "print" => {
-                let ident = self.next_ident();
-                self.symbol_table.find(ident).print(0);
+                self.inc();
+
+                let node = self.expr();
+                node.print(0);
             },
             Token::Ident(name) => {
+                self.inc();
+
                 if self.expect("=") {
                     let value = self.expr();
                     self.symbol_table.set(name.to_string(), Node::Var { name: name.to_string(), point: Some(Box::new(value)) });
                 }
             },
             _ => {
-                error("expected an identifier");
+                self.expr();
             },
         }
         self.consume(";");
@@ -328,15 +452,14 @@ impl Parser {
                 self.consume(")");
                 node
             },
-            Token::Reserved(name) => {
+            Token::Reserved(tok) if &*tok == "dif" => {
                 self.consume("(");
                 let lhs = self.expr();
                 self.consume(",");
                 let rhs = self.expr();
                 self.consume(")");
-                if name == "exp" { return Node::BinaryOperator { kind: Exp, lhs: Box::new(lhs), rhs: Box::new(rhs) }; }
-                if name == "log" { return Node::BinaryOperator { kind: Log, lhs: Box::new(lhs), rhs: Box::new(rhs) }; }
-                Node::Num { val: 0.0 }
+                
+                Node::dif(lhs.clone(), rhs.clone())
             },
             Token::Ident(ident) => {
                 let node = self.symbol_table.find(ident.clone());
@@ -358,6 +481,10 @@ impl Parser {
             },
             Token::Num(val) => {
                 Node::Num { val: val as f32 }
+            },
+            _ => {
+                println!("error: unexpected token", );
+                Node::Num { val: 0.0 }
             },
         }
     }

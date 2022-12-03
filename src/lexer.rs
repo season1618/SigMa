@@ -1,6 +1,6 @@
 use Token::*;
 
-#[derive(Clone, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Token {
     Reserved(String),
     Ident(String),
@@ -12,7 +12,7 @@ pub struct Lexer {
     pos: usize,
 }
 
-const KEYWORDS: [&str; 8] = ["var", "op", "sin", "cos", "tan", "exp", "log", "print"];
+const KEYWORDS: [&str; 9] = ["var", "op", "sin", "cos", "tan", "exp", "log", "dif", "print"];
 const PUNCTS: [char; 17] = ['D', '=', '+', '-', '*', '/', '^', '.', ',', ':', ';', '(', ')', '{', '}', '[', ']'];
 
 impl Lexer {
