@@ -85,6 +85,8 @@ impl Node {
                     Sin => { print!("sin "); }
                     Cos => { print!("cos "); }
                     Tan => { print!("tan "); }
+                    Exp => { print!("exp "); }
+                    Log => { print!("log "); }
                     _ => { print!(" "); }
                 }
                 operand.print(indent + 1);
@@ -312,6 +314,8 @@ impl Parser {
         if self.expect("sin") { return UnaryOperator { kind: Sin, operand: Box::new(self.unary()) }; }
         if self.expect("cos") { return UnaryOperator { kind: Cos, operand: Box::new(self.unary()) }; }
         if self.expect("tan") { return UnaryOperator { kind: Tan, operand: Box::new(self.unary()) }; }
+        if self.expect("exp") { return UnaryOperator { kind: Exp, operand: Box::new(self.unary()) }; }
+        if self.expect("log") { return UnaryOperator { kind: Log, operand: Box::new(self.unary()) }; }
         self.prim()
     }
 
