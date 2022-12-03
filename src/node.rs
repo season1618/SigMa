@@ -8,6 +8,7 @@ pub enum BKind {
     Sub,
     Mul,
     Div,
+    Pow,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -80,8 +81,44 @@ impl Node {
                             lhs: Box::new(BinaryOperator { kind: Mul, lhs: Box::new(Node::dif((*lhs).clone(), node2.clone())), rhs: Box::new((*rhs).clone()) }),
                             rhs: Box::new(BinaryOperator { kind: Mul, lhs: Box::new((*lhs).clone()), rhs: Box::new(Node::dif((*rhs).clone(), node2.clone())) })
                         }),
-                        rhs: Box::new(BinaryOperator { kind: Mul, lhs: Box::new(node2.clone()), rhs: Box::new(node2.clone()) })
-                    }
+                        rhs: Box::new(BinaryOperator { kind: Pow, lhs: Box::new(node2.clone()), rhs: Box::new(Num { val: 2.0 }) })
+                    },
+                    Pow => BinaryOperator {
+                        kind: Add,
+                        lhs: Box::new(BinaryOperator {
+                            kind: Mul,
+                            lhs: Box::new(BinaryOperator {
+                                kind: Mul,
+                                lhs: Box::new((*rhs).clone()),
+                                rhs: Box::new(BinaryOperator {
+                                    kind: Pow,
+                                    lhs: Box::new((*lhs).clone()),
+                                    rhs: Box::new(BinaryOperator {
+                                        kind: Sub,
+                                        lhs: Box::new((*rhs).clone()),
+                                        rhs: Box::new(Num { val: 1.0 })
+                                    })
+                                })
+                            }),
+                            rhs: Box::new(Node::dif((*lhs).clone(), node2.clone()))
+                        }),
+                        rhs: Box::new(BinaryOperator {
+                            kind: Mul,
+                            lhs: Box::new(BinaryOperator {
+                                kind: Mul,
+                                lhs: Box::new(BinaryOperator {
+                                    kind: Pow,
+                                    lhs: Box::new((*lhs).clone()),
+                                    rhs: Box::new((*rhs).clone())
+                                }),
+                                rhs: Box::new(UnaryOperator {
+                                    kind: Log,
+                                    operand: Box::new((*lhs).clone())
+                                })
+                            }),
+                            rhs: Box::new(Node::dif((*rhs).clone(), node2.clone()))
+                        })
+                    },
                 }
             },
             UnaryOperator { kind, operand } => {
@@ -104,9 +141,9 @@ impl Node {
                         kind: Div,
                         lhs: Box::new(Node::dif((*operand).clone(), node2.clone())),
                         rhs: Box::new(BinaryOperator {
-                            kind: Mul,
+                            kind: Pow,
                             lhs: Box::new(UnaryOperator { kind: Cos, operand: Box::new((*operand).clone()) }),
-                            rhs: Box::new(UnaryOperator { kind: Cos, operand: Box::new((*operand).clone()) })
+                            rhs: Box::new(Num { val: 2.0 })
                         })
                     },
                     Exp => BinaryOperator {
@@ -117,7 +154,7 @@ impl Node {
                     Log => BinaryOperator {
                         kind: Div,
                         lhs: Box::new(Node::dif((*operand).clone(), node2)),
-                        rhs: Box::new(UnaryOperator { kind: Exp, operand: Box::new((*operand).clone()) })
+                        rhs: Box::new((*operand).clone())
                     },
                 }
             },
@@ -150,6 +187,7 @@ impl Node {
                     Sub => { print!(" - "); }
                     Mul => { print!(" * "); }
                     Div => { print!(" / "); }
+                    Pow => { print!(" ^ "); }
                 }
                 rhs.print(indent + 1);
             },

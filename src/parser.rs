@@ -234,18 +234,26 @@ impl Parser {
     }
 
     fn mul(&mut self) -> Node {
-        let mut node = self.unary();
+        let mut node = self.power();
         loop {
             if self.expect("*") {
-                node = BinaryOperator { kind: Mul, lhs: Box::new(node), rhs: Box::new(self.unary()) };
+                node = BinaryOperator { kind: Mul, lhs: Box::new(node), rhs: Box::new(self.power()) };
                 continue;
             }
             if self.expect("/") {
-                node = BinaryOperator { kind: Div, lhs: Box::new(node), rhs: Box::new(self.unary()) };
+                node = BinaryOperator { kind: Div, lhs: Box::new(node), rhs: Box::new(self.power()) };
                 continue;
             }
             return node;
         }
+    }
+
+    fn power(&mut self) -> Node {
+        let mut node = self.unary();
+        if self.expect("^") {
+            node = Node::BinaryOperator { kind: Pow, lhs: Box::new(node), rhs: Box::new(self.power()) };
+        }
+        node
     }
 
     fn unary(&mut self) -> Node {
