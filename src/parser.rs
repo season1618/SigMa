@@ -159,7 +159,7 @@ impl Parser {
     fn stmt(&mut self) {
         let token = self.token_list[self.pos].clone();
         match token {
-            Token::Reserved(s) if &*s == "var" => {
+            Token::Reserved(s) if s == "var" => {
                 self.inc();
 
                 let var: Node;
@@ -171,7 +171,7 @@ impl Parser {
                 }
                 self.symbol_table.push(var);
             },
-            Token::Reserved(s) if &*s == "op" => {
+            Token::Reserved(s) if s == "op" => {
                 self.inc();
 
                 let name = self.next_ident();
@@ -193,7 +193,7 @@ impl Parser {
                 let operator = Operator { name, args, cont };
                 self.op_table.push(operator);
             },
-            Token::Reserved(s) if &*s == "print" => {
+            Token::Reserved(s) if s == "print" => {
                 self.inc();
 
                 let node = self.expr();
@@ -263,12 +263,12 @@ impl Parser {
         let token = self.token_list[self.pos].clone();
         self.inc();
         match token {
-            Token::Reserved(tok) if &*tok == "(" => {
+            Token::Reserved(tok) if tok == "(" => {
                 let node = self.expr();
                 self.consume(")");
                 node
             },
-            Token::Reserved(tok) if &*tok == "dif" => {
+            Token::Reserved(tok) if tok == "dif" => {
                 self.consume("(");
                 let lhs = self.expr();
                 self.consume(",");
@@ -280,7 +280,7 @@ impl Parser {
             Token::Ident(ident) => {
                 let node = self.symbol_table.find(ident.clone());
                 match node {
-                    Node::Num { ref val } if *val == 0.0 => {},
+                    Node::Num { val } if val == 0.0 => {},
                     _ => { return node; },
                 }
                 let op = self.op_table.find(ident.clone());
@@ -311,13 +311,9 @@ impl Parser {
 
     fn expect(&mut self, name: &str) -> bool {
         match &self.token_list[self.pos] {
-            Reserved(symbol) => {
-                if symbol == name {
-                    self.pos += 1;
-                    true
-                } else {
-                    false
-                }
+            Reserved(symbol) if symbol == name => {
+                self.pos += 1;
+                true
             },
             _ => {
                 false
