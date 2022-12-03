@@ -13,7 +13,7 @@ pub struct Lexer {
 }
 
 const KEYWORDS: [&str; 9] = ["var", "op", "sin", "cos", "tan", "exp", "log", "dif", "print"];
-const PUNCTS: [char; 17] = ['D', '=', '+', '-', '*', '/', '^', '.', ',', ':', ';', '(', ')', '{', '}', '[', ']'];
+const PUNCTS: [char; 16] = ['=', '+', '-', '*', '/', '^', '.', ',', ':', ';', '(', ')', '{', '}', '[', ']'];
 
 impl Lexer {
     pub fn new(code: String) -> Self {
@@ -45,12 +45,12 @@ impl Lexer {
                 self.pos += 1;
                 continue;
             }
-            if c.is_ascii_alphabetic() {
+            if c.is_ascii_alphabetic() || c == '_' {
                 let mut name = c.to_string();
                 loop {
                     self.pos += 1;
                     c = self.chs[self.pos];
-                    if c.is_ascii_alphanumeric() {
+                    if c.is_ascii_alphanumeric() || c == '_' {
                         name.push(c);
                     } else {
                         break;
