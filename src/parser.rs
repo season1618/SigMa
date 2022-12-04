@@ -155,14 +155,19 @@ impl Parser {
             Token::Reserved(s) if s == "var" => {
                 self.inc();
 
-                let var: Node;
-                let name = self.next_ident();
-                if self.expect("=") {
-                    var = Node::Var { name: name, point: Some(Box::new(self.expr())) };
-                } else {
-                    var = Node::Var { name: name, point: None };
+                loop {
+                    let var: Node;
+                    let name = self.next_ident();
+                    if self.expect("=") {
+                        var = Node::Var { name: name, point: Some(Box::new(self.expr())) };
+                    } else {
+                        var = Node::Var { name: name, point: None };
+                    }
+                    self.symbol_table.push(var);
+                    
+                    if self.expect(",") { continue; }
+                    else { break; }
                 }
-                self.symbol_table.push(var);
             },
             Token::Reserved(s) if s == "op" => {
                 self.inc();
