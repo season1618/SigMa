@@ -11,8 +11,6 @@ fn main() {
     let args: Vec<String> = env::args().collect();
     let file_path = &args[1];
 
-    println!("In file {}", file_path);
-
     let code = fs::read_to_string(file_path).expect("Should have been able to read the file");
     let mut lexer = Lexer::new(code);
     let token_list = lexer.tokenize();

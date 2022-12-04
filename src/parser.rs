@@ -1,4 +1,4 @@
-use std::process::exit;
+// use std::process::exit;
 use crate::node::*;
 use crate::lexer::*;
 
@@ -6,11 +6,6 @@ use Token::*;
 use BKind::*;
 use UKind::*;
 use Node::*;
-
-fn error(msg: &str) {
-    println!("error: {}", msg);
-    exit(256);
-}
 
 #[derive(Debug, Clone)]
 struct Operator {
@@ -64,17 +59,16 @@ impl OperatorTable {
         self.vec.pop();
     }
 
-    fn find(&mut self, name: String) -> Operator {
+    fn find(&mut self, name: String) -> Option<Operator> {
         for i in (0..self.vec.len()).rev() {
-            match self.vec[i] {
-                Operator { name: ref name_, .. } if *name_ == name => {
-                    return self.vec[i].clone();
+            match self.vec[i].clone() {
+                Operator { name: name_, .. } if name_ == name => {
+                    return Some(self.vec[i].clone());
                 },
                 _ => {},
             }
         }
-        println!("error: {} is undeclared.", name);
-        Operator { name: String::new(), args: Vec::new(), cont: Node::Num { val: 0.0 } }
+        None
     }
 }
 
@@ -103,30 +97,29 @@ impl SymbolTable {
         self.vec.pop();
     }
 
-    fn find(&mut self, name: String) -> Node {
+    fn find(&mut self, name: String) -> Option<Node> {
         for i in (0..self.vec.len()).rev() {
-            match self.vec[i] {
-                Node::Var { name: ref name_, .. } if *name_ == name => {
-                    return self.vec[i].clone();
+            match self.vec[i].clone() {
+                Node::Var { name: name_, .. } if name_ == name => {
+                    return Some(self.vec[i].clone());
                 },
                 _ => {},
             }
         }
-        println!("error: {} is undeclared.", name);
-        Node::Num { val: 0.0 }
+        None
     }
 
     fn set(&mut self, name: String, node: Node) {
         for i in (0..self.vec.len()).rev() {
-            match self.vec[i] {
-                Node::Var { name: ref name_, .. } if *name_ == name => {
+            match self.vec[i].clone() {
+                Node::Var { name: name_, .. } if name_ == name => {
                     self.vec[i] = Node::Var { name: name, point: Some(Box::new(node)) };
                     return;
                 },
-                _ => {}
+                _ => {},
             }
         }
-        println!("error: {} is undeclared.", name);
+        println!("\x1b[31merror\x1b[39m: {} is undeclared.", name);
     }
 }
 
@@ -286,28 +279,29 @@ impl Parser {
                 Node::dif(lhs.clone(), rhs.clone())
             },
             Token::Ident(ident) => {
-                let node = self.symbol_table.find(ident.clone());
-                match node {
-                    Node::Num { val } if val == 0.0 => {},
-                    _ => { return node; },
+                if let Some(node) = self.symbol_table.find(ident.clone()) {
+                    return node;
                 }
-                let op = self.op_table.find(ident.clone());
-                let mut params = Vec::new();
-                self.consume("(");
-                loop {
-                    let param = self.expr();
-                    params.push(param);
-                    if self.expect(",") { continue; }
-                    if self.expect(")") { break; }
-                }
+                if let Some(op) = self.op_table.find(ident.clone()) {
+                    let mut params = Vec::new();
+                    self.consume("(");
+                    loop {
+                        let param = self.expr();
+                        params.push(param);
+                        if self.expect(",") { continue; }
+                        if self.expect(")") { break; }
+                    }
 
-                op.construct(op.cont.clone(), params)
+                    return op.construct(op.cont.clone(), params);
+                }
+                println!("\x1b[31merror\x1b[39m: expected an identifier");
+                Node::Num { val: 0.0 }
             },
             Token::Num(val) => {
                 Node::Num { val: val as f32 }
             },
             _ => {
-                println!("error: unexpected token", );
+                println!("\x1b[31merror\x1b[39m: unexpected token");
                 Node::Num { val: 0.0 }
             },
         }
@@ -335,7 +329,7 @@ impl Parser {
                 self.pos += 1;
             },
             _ => {
-                println!("error: expected '{}'", name);
+                println!("\x1b[31merror\x1b[39m: expected '{}'", name);
             },
         }
     }
@@ -347,7 +341,7 @@ impl Parser {
                 ident.to_string()
             },
             _ => {
-                println!("error: expected an identifier");
+                println!("\x1b[31merror\x1b[39m: expected an identifier");
                 String::from("_")
             }
         }
