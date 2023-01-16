@@ -15,5 +15,7 @@ fn main() {
     let mut lexer = Lexer::new(code);
     let token_list = lexer.tokenize();
     let mut parser = Parser::new(&token_list);
-    let node_list = parser.prog();
+    if let Ok(node_list) = parser.prog() {
+        ;
+    }
 }

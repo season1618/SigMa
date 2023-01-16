@@ -1,4 +1,3 @@
-// use std::process::exit;
 use crate::node::*;
 use crate::lexer::*;
 
@@ -140,16 +139,16 @@ impl Parser {
         }
     }
 
-    pub fn prog(&mut self) -> Vec<Node> {
+    pub fn prog(&mut self) -> Result<Vec<Node>,()> {
         let mut node_list: Vec<Node> = Vec::new();
         while self.pos < self.token_list.len() {
-            self.stmt();
+            self.stmt()?;
         }
         // println!("{:?}", self.symbol_table);
-        node_list
+        Ok(node_list)
     }
 
-    fn stmt(&mut self) {
+    fn stmt(&mut self) -> Result<(),()> {
         let token = self.token_list[self.pos].clone();
         match token {
             Token::Reserved(s) if s == "var" => {
@@ -157,9 +156,9 @@ impl Parser {
 
                 loop {
                     let var: Node;
-                    let name = self.next_ident();
+                    let name = self.next_ident()?;
                     if self.expect("=") {
-                        var = Node::Var { name: name, point: Some(Box::new(self.expr())) };
+                        var = Node::Var { name: name, point: Some(Box::new(self.expr()?)) };
                     } else {
                         var = Node::Var { name: name, point: None };
                     }
@@ -172,12 +171,12 @@ impl Parser {
             Token::Reserved(s) if s == "op" => {
                 self.inc();
 
-                let name = self.next_ident();
+                let name = self.next_ident()?;
                 let mut args = Vec::new();
 
                 self.consume("(");
                 loop {
-                    let arg = Node::Var { name: self.next_ident(), point: None };
+                    let arg = Node::Var { name: self.next_ident()?, point: None };
                     args.push(arg.clone());
                     self.symbol_table.push(arg);
                     if self.expect(",") { continue; }
@@ -185,7 +184,7 @@ impl Parser {
                 }
 
                 self.consume("{");
-                let cont = self.expr();
+                let cont = self.expr()?;
                 self.consume("}");
 
                 let operator = Operator { name, args, cont };
@@ -194,120 +193,121 @@ impl Parser {
             Token::Reserved(s) if s == "print" => {
                 self.inc();
 
-                let node = self.expr();
+                let node = self.expr()?;
                 node.print(0);
             },
             Token::Ident(name) => {
                 self.inc();
 
                 if self.expect("=") {
-                    let value = self.expr();
+                    let value = self.expr()?;
                     self.symbol_table.set(name.to_string(), Node::Var { name: name.to_string(), point: Some(Box::new(value)) });
                 }
             },
             _ => {
-                self.expr();
+                self.expr()?;
             },
         }
         self.consume(";");
+        Ok(())
     }
 
-    fn expr(&mut self) -> Node {
+    fn expr(&mut self) -> Result<Node,()> {
         self.add()
     }
 
-    fn add(&mut self) -> Node {
-        let mut node = self.mul();
+    fn add(&mut self) -> Result<Node,()> {
+        let mut node = self.mul()?;
         loop {
             if self.expect("+") {
-                node = BinaryOperator { kind: Add, lhs: Box::new(node), rhs: Box::new(self.mul()) };
+                node = BinaryOperator { kind: Add, lhs: Box::new(node), rhs: Box::new(self.mul()?) };
                 continue;
             }
             if self.expect("-") {
-                node = BinaryOperator { kind: Sub, lhs: Box::new(node), rhs: Box::new(self.mul()) };
+                node = BinaryOperator { kind: Sub, lhs: Box::new(node), rhs: Box::new(self.mul()?) };
                 continue;
             }
-            return node;
+            return Ok(node);
         }
     }
 
-    fn mul(&mut self) -> Node {
-        let mut node = self.power();
+    fn mul(&mut self) -> Result<Node,()> {
+        let mut node = self.power()?;
         loop {
             if self.expect("*") {
-                node = BinaryOperator { kind: Mul, lhs: Box::new(node), rhs: Box::new(self.power()) };
+                node = BinaryOperator { kind: Mul, lhs: Box::new(node), rhs: Box::new(self.power()?) };
                 continue;
             }
             if self.expect("/") {
-                node = BinaryOperator { kind: Div, lhs: Box::new(node), rhs: Box::new(self.power()) };
+                node = BinaryOperator { kind: Div, lhs: Box::new(node), rhs: Box::new(self.power()?) };
                 continue;
             }
-            return node;
+            return Ok(node);
         }
     }
 
-    fn power(&mut self) -> Node {
-        let mut node = self.unary();
+    fn power(&mut self) -> Result<Node,()> {
+        let mut node = self.unary()?;
         if self.expect("^") {
-            node = Node::BinaryOperator { kind: Pow, lhs: Box::new(node), rhs: Box::new(self.power()) };
+            node = Node::BinaryOperator { kind: Pow, lhs: Box::new(node), rhs: Box::new(self.power()?) };
         }
-        node
+        Ok(node)
     }
 
-    fn unary(&mut self) -> Node {
+    fn unary(&mut self) -> Result<Node,()> {
         if self.expect("+") { return self.unary(); }
-        if self.expect("-") { return UnaryOperator { kind: Neg, operand: Box::new(self.unary()) }; }
-        if self.expect("sin") { return UnaryOperator { kind: Sin, operand: Box::new(self.unary()) }; }
-        if self.expect("cos") { return UnaryOperator { kind: Cos, operand: Box::new(self.unary()) }; }
-        if self.expect("tan") { return UnaryOperator { kind: Tan, operand: Box::new(self.unary()) }; }
-        if self.expect("exp") { return UnaryOperator { kind: Exp, operand: Box::new(self.unary()) }; }
-        if self.expect("log") { return UnaryOperator { kind: Log, operand: Box::new(self.unary()) }; }
+        if self.expect("-") { return Ok(UnaryOperator { kind: Neg, operand: Box::new(self.unary()?) }); }
+        if self.expect("sin") { return Ok(UnaryOperator { kind: Sin, operand: Box::new(self.unary()?) }); }
+        if self.expect("cos") { return Ok(UnaryOperator { kind: Cos, operand: Box::new(self.unary()?) }); }
+        if self.expect("tan") { return Ok(UnaryOperator { kind: Tan, operand: Box::new(self.unary()?) }); }
+        if self.expect("exp") { return Ok(UnaryOperator { kind: Exp, operand: Box::new(self.unary()?) }); }
+        if self.expect("log") { return Ok(UnaryOperator { kind: Log, operand: Box::new(self.unary()?) }); }
         self.prim()
     }
 
-    fn prim(&mut self) -> Node {
+    fn prim(&mut self) -> Result<Node,()> {
         let token = self.token_list[self.pos].clone();
         self.inc();
         match token {
             Token::Reserved(tok) if tok == "(" => {
-                let node = self.expr();
+                let node = self.expr()?;
                 self.consume(")");
-                node
+                Ok(node)
             },
             Token::Reserved(tok) if tok == "dif" => {
                 self.consume("(");
-                let lhs = self.expr();
+                let lhs = self.expr()?;
                 self.consume(",");
-                let rhs = self.expr();
+                let rhs = self.expr()?;
                 self.consume(")");
                 
-                Node::dif(lhs.clone(), rhs.clone())
+                Ok(Node::dif(lhs.clone(), rhs.clone()))
             },
             Token::Ident(ident) => {
                 if let Some(node) = self.symbol_table.find(ident.clone()) {
-                    return node;
+                    return Ok(node);
                 }
                 if let Some(op) = self.op_table.find(ident.clone()) {
                     let mut params = Vec::new();
                     self.consume("(");
                     loop {
-                        let param = self.expr();
+                        let param = self.expr()?;
                         params.push(param);
                         if self.expect(",") { continue; }
                         if self.expect(")") { break; }
                     }
 
-                    return op.construct(op.cont.clone(), params);
+                    return Ok(op.construct(op.cont.clone(), params));
                 }
                 println!("\x1b[31merror\x1b[39m: expected an identifier");
-                Node::Num { val: 0.0 }
+                Err(())
             },
             Token::Num(val) => {
-                Node::Num { val: val as f32 }
+                Ok(Node::Num { val: val as f32 })
             },
             _ => {
                 println!("\x1b[31merror\x1b[39m: unexpected token");
-                Node::Num { val: 0.0 }
+                Err(())
             },
         }
     }
@@ -339,15 +339,15 @@ impl Parser {
         }
     }
 
-    fn next_ident(&mut self) -> String {
+    fn next_ident(&mut self) -> Result<String,()> {
         match &self.token_list[self.pos] {
             Ident(ident) => {
                 self.pos += 1;
-                ident.to_string()
+                Ok(ident.to_string())
             },
             _ => {
                 println!("\x1b[31merror\x1b[39m: expected an identifier");
-                String::from("_")
+                Err(())
             }
         }
     }
