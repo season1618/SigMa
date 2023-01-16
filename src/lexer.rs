@@ -28,11 +28,8 @@ impl Lexer {
         while self.pos < self.chs.len() {
             let mut c = self.chs[self.pos];
             if c == '/' && self.chs[self.pos+1] == '/' {
-                loop {
+                while self.chs[self.pos] != '\n' {
                     self.pos += 1;
-                    if self.chs[self.pos] == '\n' {
-                        break;
-                    }
                 }
                 continue;
             }
@@ -46,15 +43,11 @@ impl Lexer {
                 continue;
             }
             if c.is_ascii_alphabetic() || c == '_' {
-                let mut name = c.to_string();
-                loop {
+                let mut name = "".to_string();
+                while c.is_ascii_alphanumeric() || c == '_' {
+                    name.push(c);
                     self.pos += 1;
                     c = self.chs[self.pos];
-                    if c.is_ascii_alphanumeric() || c == '_' {
-                        name.push(c);
-                    } else {
-                        break;
-                    }
                 }
                 if KEYWORDS.to_vec().iter().find(|&&x| x == name) != None {
                     token_list.push(Reserved(name));
@@ -64,15 +57,11 @@ impl Lexer {
                 continue;
             }
             if c.is_digit(10) {
-                let mut val = c.to_digit(10).unwrap();
-                loop {
+                let mut val = 0;
+                while c.is_digit(10) {
+                    val = 10 * val + c.to_digit(10).unwrap();
                     self.pos += 1;
                     c = self.chs[self.pos];
-                    if c.is_digit(10) {
-                        val = 10 * val + c.to_digit(10).unwrap();
-                    } else {
-                        break;
-                    }
                 }
                 token_list.push(Num(val));
                 continue;
